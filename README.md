@@ -45,3 +45,11 @@ Pruebas (H2 en memoria):
 ```sh
 ./mvnw test
 ```
+
+RDS: antes del primer despliegue, conectarse a MySQL y crear la base:
+
+```sql
+CREATE DATABASE IF NOT EXISTS cloudsumativa1;
+```
+
+`MYSQL_JDBC_URL` debe apuntar a esa base. Las tablas se crean automáticamente.

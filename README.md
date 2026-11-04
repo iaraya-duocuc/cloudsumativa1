@@ -53,3 +53,5 @@ CREATE DATABASE IF NOT EXISTS cloudsumativa1;
 ```
 
 `MYSQL_JDBC_URL` debe apuntar a esa base. Las tablas se crean automáticamente.
+
+Al reiniciar el lab de AWS Academy, actualizar `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y `AWS_SESSION_TOKEN` en GitHub Secrets y volver a ejecutar el workflow de despliegue.

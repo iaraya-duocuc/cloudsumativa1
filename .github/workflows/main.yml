@@ -105,12 +105,19 @@ jobs:
           IMAGE="$DOCKERHUB_USERNAME/cloudsumativa1:$IMAGE_TAG"
           docker pull "$IMAGE"
 
+          if ! findmnt -rn -t nfs,nfs4 --mountpoint /mnt/efs >/dev/null; then
+            echo 'Deployment aborted: EFS is not mounted at /mnt/efs.' >&2
+            exit 1
+          fi
+
           if docker container inspect cloudsumativa1 >/dev/null 2>&1; then
             docker stop cloudsumativa1
             docker rm cloudsumativa1
           fi
 
           docker run -d --name cloudsumativa1 --restart unless-stopped \
+            -v /mnt/efs:/app/efs \
+            -e TICKETS_STORAGE_PATH=/app/efs/tickets \
             -p 8080:8080 \
             -e SPRING_PROFILES_ACTIVE=mysql \
             -e SPRING_DATASOURCE_URL="$MYSQL_JDBC_URL" \

@@ -1,0 +1,102 @@
+package com.duoc.cloudsumativa1.service;
+
+import com.duoc.cloudsumativa1.dto.TicketResponse;
+import com.duoc.cloudsumativa1.model.Evento;
+import com.duoc.cloudsumativa1.model.Ticket;
+import com.duoc.cloudsumativa1.model.Usuario;
+import com.duoc.cloudsumativa1.repository.EventoRepository;
+import com.duoc.cloudsumativa1.repository.TicketRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Service
+public class TicketService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TicketService.class);
+    private final TicketRepository tickets;
+    private final EventoRepository eventos;
+    private final UsuarioService usuarios;
+    private final TicketStorageService storage;
+
+    public TicketService(TicketRepository tickets, EventoRepository eventos,
+                         UsuarioService usuarios, TicketStorageService storage) {
+        this.tickets = tickets;
+        this.eventos = eventos;
+        this.usuarios = usuarios;
+        this.storage = storage;
+    }
+
+    @Transactional
+    public TicketResponse crear(Long eventoId, Long usuarioId) {
+        Usuario usuario = usuarios.buscarPorId(usuarioId);
+        Evento evento = eventos.buscarParaReserva(eventoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
+        if (evento.getCuposDisponibles() <= 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No quedan cupos disponibles");
+        }
+
+        Ticket ticket = new Ticket();
+        ticket.setCodigo(UUID.randomUUID().toString());
+        ticket.setFechaReserva(LocalDateTime.now());
+        ticket.setEvento(evento);
+        ticket.setUsuario(usuario);
+        evento.setCuposDisponibles(evento.getCuposDisponibles() - 1);
+
+        try {
+            Path archivo = storage.guardar(ticket);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status != STATUS_COMMITTED) {
+                        try {
+                            Files.deleteIfExists(archivo);
+                        } catch (IOException ex) {
+                            log.error("No se pudo eliminar el TXT de una reserva revertida: {}", archivo, ex);
+                        }
+                    }
+                }
+            });
+            ticket.setRutaArchivo(archivo.toString());
+            tickets.saveAndFlush(ticket);
+            return TicketResponse.desde(ticket);
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo guardar el ticket", ex);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public TicketResponse consultar(Long id) {
+        return TicketResponse.desde(buscar(id));
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] descargar(Long id) {
+        Ticket ticket = buscar(id);
+        if (ticket.getRutaArchivo() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Archivo de ticket no encontrado");
+        }
+        try {
+            return storage.leer(ticket.getRutaArchivo());
+        } catch (NoSuchFileException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Archivo de ticket no encontrado", ex);
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo leer el ticket", ex);
+        }
+    }
+
+    private Ticket buscar(Long id) {
+        return tickets.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket no encontrado"));
+    }
+}

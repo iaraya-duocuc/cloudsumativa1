@@ -45,6 +45,12 @@ jobs:
       MYSQL_JDBC_URL: ${{ secrets.MYSQL_JDBC_URL }}
       MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
       MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+      S3_ENABLED: "true"
+      AWS_REGION: us-east-1
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -84,6 +90,12 @@ jobs:
             printf 'MYSQL_JDBC_URL=%q\n' "$MYSQL_JDBC_URL"
             printf 'MYSQL_USERNAME=%q\n' "$MYSQL_USERNAME"
             printf 'MYSQL_PASSWORD=%q\n' "$MYSQL_PASSWORD"
+            printf 'S3_ENABLED=%q\n' "$S3_ENABLED"
+            printf 'AWS_REGION=%q\n' "$AWS_REGION"
+            printf 'S3_BUCKET=%q\n' "$S3_BUCKET"
+            printf 'AWS_ACCESS_KEY_ID=%q\n' "$AWS_ACCESS_KEY_ID"
+            printf 'AWS_SECRET_ACCESS_KEY=%q\n' "$AWS_SECRET_ACCESS_KEY"
+            printf 'AWS_SESSION_TOKEN=%q\n' "$AWS_SESSION_TOKEN"
             cat <<'REMOTE'
           export DOCKER_CONFIG
           DOCKER_CONFIG=$(mktemp -d)
@@ -104,6 +116,12 @@ jobs:
             -e SPRING_DATASOURCE_URL="$MYSQL_JDBC_URL" \
             -e SPRING_DATASOURCE_USERNAME="$MYSQL_USERNAME" \
             -e SPRING_DATASOURCE_PASSWORD="$MYSQL_PASSWORD" \
+            -e S3_ENABLED="$S3_ENABLED" \
+            -e AWS_REGION="$AWS_REGION" \
+            -e S3_BUCKET="$S3_BUCKET" \
+            -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+            -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+            -e AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN" \
             "$IMAGE"
 
           for attempt in $(seq 1 30); do

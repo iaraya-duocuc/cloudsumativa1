@@ -26,10 +26,19 @@ Para reutilizar un contenedor detenido: `docker start db-sumativa1`.
 
 Las tablas se crean automáticamente. Cada motor conserva sus propios datos.
 
-S3 (opcional, independiente de H2/MySQL): en `application.properties` configurar
-`app.s3.enabled=true`, `app.s3.bucket` y las tres credenciales `app.aws.*` de AWS Academy.
-Los tickets se suben automáticamente; `POST /tickets/{id}/s3` permite reintentarlo y
-`GET /tickets/{id}/s3` descarga desde S3.
+S3 (opcional, con H2 o MySQL):
+
+```sh
+S3_ENABLED=true \
+AWS_REGION=us-east-1 \
+S3_BUCKET='nombre-del-bucket' \
+AWS_ACCESS_KEY_ID='tu-access-key' \
+AWS_SECRET_ACCESS_KEY='tu-secret-key' \
+AWS_SESSION_TOKEN='tu-session-token' \
+./mvnw spring-boot:run
+```
+
+Para MySQL, agregar `-Dspring-boot.run.profiles=mysql` al comando.
 
 Pruebas (H2 en memoria):
 

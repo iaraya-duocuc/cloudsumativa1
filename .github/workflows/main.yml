@@ -101,9 +101,9 @@ jobs:
           docker run -d --name cloudsumativa1 --restart unless-stopped \
             -p 8080:8080 \
             -e SPRING_PROFILES_ACTIVE=mysql \
-            -e MYSQL_JDBC_URL="$MYSQL_JDBC_URL" \
-            -e MYSQL_USERNAME="$MYSQL_USERNAME" \
-            -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+            -e SPRING_DATASOURCE_URL="$MYSQL_JDBC_URL" \
+            -e SPRING_DATASOURCE_USERNAME="$MYSQL_USERNAME" \
+            -e SPRING_DATASOURCE_PASSWORD="$MYSQL_PASSWORD" \
             "$IMAGE"
 
           for attempt in $(seq 1 30); do

@@ -69,6 +69,26 @@ class EventosUsuariosApiTests {
     }
 
     @Test
+    void rechazaCorreoDuplicadoSinDistinguirMayusculas() throws Exception {
+        mvc.perform(post("/usuarios").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nombre":"Ana","correo":"ana@example.com"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mvc.perform(post("/usuarios").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nombre":"Otra Ana","correo":"ANA@EXAMPLE.COM"}
+                                """))
+                .andExpect(status().isConflict());
+
+        mvc.perform(get("/usuarios"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].nombre").value("Ana"));
+    }
+
+    @Test
     void rechazaDatosInvalidos() throws Exception {
         mvc.perform(post("/eventos").contentType(MediaType.APPLICATION_JSON)
                         .content("""

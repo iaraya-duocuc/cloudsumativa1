@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class UsuarioService {
@@ -18,9 +19,15 @@ public class UsuarioService {
     }
 
     public Usuario crear(Usuario usuario) {
+        String correo = usuario.getCorreo().trim().toLowerCase(Locale.ROOT);
+        if (repository.existsByCorreoIgnoreCase(correo)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "El correo ya está registrado");
+        }
+
         Usuario nuevo = new Usuario();
         nuevo.setNombre(usuario.getNombre());
-        nuevo.setCorreo(usuario.getCorreo());
+        nuevo.setCorreo(correo);
         return repository.save(nuevo);
     }
 

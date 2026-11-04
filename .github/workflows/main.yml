@@ -1,1 +1,128 @@
 
+name: Test, publish and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run tests
+        run: sh ./mvnw -B test
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production-deployment
+      cancel-in-progress: false
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      USER_SERVER: ${{ secrets.USER_SERVER }}
+      EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      IMAGE_TAG: ${{ github.sha }}
+      # Replace these placeholders with the reachable MySQL server and credentials.
+      MYSQL_JDBC_URL: ${{ secrets.MYSQL_JDBC_URL }}
+      MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+      MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          IMAGE="$DOCKERHUB_USERNAME/cloudsumativa1"
+          docker build -t "$IMAGE:$IMAGE_TAG" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$IMAGE_TAG"
+          docker push "$IMAGE:latest"
+
+      - name: Deploy to EC2 and verify endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          KEY_FILE="$RUNNER_TEMP/ec2-key"
+          DEPLOY_SCRIPT="$RUNNER_TEMP/deploy.sh"
+          KNOWN_HOSTS="$RUNNER_TEMP/known_hosts"
+          trap 'rm -f "$KEY_FILE" "$DEPLOY_SCRIPT" "$KNOWN_HOSTS"' EXIT
+          printf '%s\n' "$EC2_SSH_KEY" > "$KEY_FILE"
+
+          # Shell-escape values before sending the script through SSH stdin.
+          {
+            printf 'set -euo pipefail\n'
+            printf 'DOCKERHUB_USERNAME=%q\n' "$DOCKERHUB_USERNAME"
+            printf 'DOCKERHUB_TOKEN=%q\n' "$DOCKERHUB_TOKEN"
+            printf 'IMAGE_TAG=%q\n' "$IMAGE_TAG"
+            printf 'MYSQL_JDBC_URL=%q\n' "$MYSQL_JDBC_URL"
+            printf 'MYSQL_USERNAME=%q\n' "$MYSQL_USERNAME"
+            printf 'MYSQL_PASSWORD=%q\n' "$MYSQL_PASSWORD"
+            cat <<'REMOTE'
+          export DOCKER_CONFIG
+          DOCKER_CONFIG=$(mktemp -d)
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          printf '%s' "$DOCKERHUB_TOKEN" | docker login \
+            --username "$DOCKERHUB_USERNAME" --password-stdin
+          IMAGE="$DOCKERHUB_USERNAME/cloudsumativa1:$IMAGE_TAG"
+          docker pull "$IMAGE"
+
+          if docker container inspect cloudsumativa1 >/dev/null 2>&1; then
+            docker stop cloudsumativa1
+            docker rm cloudsumativa1
+          fi
+
+          docker run -d --name cloudsumativa1 --restart unless-stopped \
+            -p 8080:8080 \
+            -e SPRING_PROFILES_ACTIVE=mysql \
+            -e MYSQL_JDBC_URL="$MYSQL_JDBC_URL" \
+            -e MYSQL_USERNAME="$MYSQL_USERNAME" \
+            -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+            "$IMAGE"
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --max-time 5 http://localhost:8080/eventos >/dev/null; then
+              echo 'Deployment verified: GET /eventos returned success.'
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'Deployment failed: GET /eventos did not become available.' >&2
+          docker logs --tail 100 cloudsumativa1
+          exit 1
+          REMOTE
+          } > "$DEPLOY_SCRIPT"
+
+          # Trust the first host key on this ephemeral runner; pin it for stronger verification.
+          ssh -i "$KEY_FILE" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=15 \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$KNOWN_HOSTS" \
+            "$USER_SERVER@$EC2_HOST" 'bash -s' < "$DEPLOY_SCRIPT"

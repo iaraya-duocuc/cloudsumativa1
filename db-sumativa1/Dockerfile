@@ -1,0 +1,6 @@
+FROM mysql:8.0
+
+ENV MYSQL_ROOT_PASSWORD=password
+ENV MYSQL_DATABASE=cloudsumativa1
+ENV MYSQL_USER=admin
+ENV MYSQL_PASSWORD=password

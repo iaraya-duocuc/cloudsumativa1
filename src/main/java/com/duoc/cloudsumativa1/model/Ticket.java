@@ -30,6 +30,10 @@ public class Ticket {
 
     private String rutaArchivo;
 
+    @jakarta.validation.constraints.Size(max = 500)
+    @Column(length = 500)
+    private String observacion;
+
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "evento_id", nullable = false)
@@ -85,5 +89,12 @@ public class Ticket {
 
     public void setUsuario(Usuario usuario) {
         this.usuario = usuario;
+    }
+    public String getObservacion() {
+        return observacion;
+    }
+
+    public void setObservacion(String observacion) {
+        this.observacion = observacion;
     }
 }

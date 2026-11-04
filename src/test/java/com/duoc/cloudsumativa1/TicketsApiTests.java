@@ -44,6 +44,7 @@ class TicketsApiTests {
     @Autowired private UsuarioRepository usuarios;
     @Autowired private TicketRepository tickets;
     @Autowired private TicketService service;
+    @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;
     private MockMvc mvc;
     private Evento evento;
     private Usuario usuario;
@@ -165,4 +166,62 @@ class TicketsApiTests {
         }
     }
 
+    @Test
+    void modificaObservacionYEliminaDevolviendoCupo() throws Exception {
+        TicketResponse ticket = service.crear(evento.getId(), usuario.getId());
+        Path archivo = Path.of(tickets.findById(ticket.id()).orElseThrow().getRutaArchivo());
+        mvc.perform(patch("/tickets/" + ticket.id()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"observacion\":\"Acceso por puerta norte\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.observacion").value("Acceso por puerta norte"));
+        mvc.perform(get("/tickets/" + ticket.id() + "/archivo"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Observación: Acceso por puerta norte")));
+        mvc.perform(get("/tickets/" + ticket.id()))
+                .andExpect(jsonPath("$.observacion").value("Acceso por puerta norte"));
+        assertThat(eventos.findById(evento.getId()).orElseThrow().getCuposDisponibles()).isZero();
+        mvc.perform(delete("/tickets/" + ticket.id())).andExpect(status().isNoContent());
+        assertThat(archivo).doesNotExist();
+        assertThat(tickets.existsById(ticket.id())).isFalse();
+        assertThat(eventos.findById(evento.getId()).orElseThrow().getCuposDisponibles()).isEqualTo(1);
+        mvc.perform(delete("/tickets/" + ticket.id())).andExpect(status().isNotFound());
+        assertThat(eventos.findById(evento.getId()).orElseThrow().getCuposDisponibles()).isEqualTo(1);
+    }
+
+    @Test
+    void validaObservacionYPermiteVaciarla() throws Exception {
+        TicketResponse ticket = service.crear(evento.getId(), usuario.getId());
+        mvc.perform(patch("/tickets/" + ticket.id()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch("/tickets/" + ticket.id()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"observacion\":\"" + "a".repeat(501) + "\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch("/tickets/" + ticket.id()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"observacion\":\"\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.observacion").value(""));
+        mvc.perform(patch("/tickets/0").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"observacion\":\"Prueba\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void restauraArchivoYDatosSiSeRevierteModificacionOEliminacion() throws Exception {
+        TicketResponse ticket = service.crear(evento.getId(), usuario.getId());
+        Path archivo = Path.of(tickets.findById(ticket.id()).orElseThrow().getRutaArchivo());
+        byte[] original = Files.readAllBytes(archivo);
+        var transaccion = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transaccion.executeWithoutResult(status -> {
+            service.modificar(ticket.id(), "Cambio temporal");
+            status.setRollbackOnly();
+        });
+        assertThat(Files.readAllBytes(archivo)).isEqualTo(original);
+        assertThat(service.consultar(ticket.id()).observacion()).isNull();
+        transaccion.executeWithoutResult(status -> {
+            service.eliminar(ticket.id());
+            status.setRollbackOnly();
+        });
+        assertThat(Files.readAllBytes(archivo)).isEqualTo(original);
+        assertThat(tickets.existsById(ticket.id())).isTrue();
+        assertThat(eventos.findById(evento.getId()).orElseThrow().getCuposDisponibles()).isZero();
+    }
 }

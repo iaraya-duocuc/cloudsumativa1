@@ -1,6 +1,7 @@
 package com.duoc.cloudsumativa1.controller;
 
 import com.duoc.cloudsumativa1.dto.CrearTicketRequest;
+import com.duoc.cloudsumativa1.dto.ModificarTicketRequest;
 import com.duoc.cloudsumativa1.dto.TicketResponse;
 import com.duoc.cloudsumativa1.service.TicketService;
 import jakarta.validation.Valid;
@@ -52,4 +53,15 @@ public class TicketController {
         return service.listarPorEvento(id);
     }
 
+    @PatchMapping("/tickets/{id}")
+    public TicketResponse modificar(@PathVariable Long id,
+                                   @Valid @RequestBody ModificarTicketRequest request) {
+        return service.modificar(id, request.observacion());
+    }
+
+    @DeleteMapping("/tickets/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        service.eliminar(id);
+        return ResponseEntity.noContent().build();
+    }
 }

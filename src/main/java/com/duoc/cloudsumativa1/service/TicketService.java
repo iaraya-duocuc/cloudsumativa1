@@ -121,6 +121,68 @@ public class TicketService {
         return tickets.findByEventoId(eventoId);
     }
 
+    @Transactional
+    public TicketResponse modificar(Long id, String observacion) {
+        Ticket ticket = buscarParaModificar(id);
+        ticket.setObservacion(observacion);
+        prepararRestauracion(ticket);
+        try {
+            storage.actualizar(ticket);
+            tickets.saveAndFlush(ticket);
+            return TicketResponse.desde(ticket);
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo actualizar el TXT", ex);
+        }
+    }
+
+    @Transactional
+    public void eliminar(Long id) {
+        Ticket ticket = buscarParaModificar(id);
+        Evento evento = eventos.buscarParaReserva(ticket.getEvento().getId()).orElseThrow();
+        prepararRestauracion(ticket);
+        try {
+            storage.eliminar(ticket.getRutaArchivo());
+            evento.setCuposDisponibles(evento.getCuposDisponibles() + 1);
+            tickets.delete(ticket);
+            tickets.flush();
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo eliminar el TXT", ex);
+        }
+    }
+
+    private Ticket buscarParaModificar(Long id) {
+        return tickets.buscarParaModificar(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket no encontrado"));
+    }
+
+    private void prepararRestauracion(Ticket ticket) {
+        String ruta = ticket.getRutaArchivo();
+        if (ruta == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Archivo de ticket no encontrado");
+        }
+        byte[] anterior;
+        try {
+            anterior = storage.leer(ruta);
+        } catch (NoSuchFileException ex) {
+            anterior = null;
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo leer el TXT", ex);
+        }
+        byte[] copia = anterior;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    try {
+                        storage.restaurar(ruta, copia);
+                    } catch (IOException ex) {
+                        log.error("No se pudo restaurar el TXT de una operación revertida: {}", ruta, ex);
+                    }
+                }
+            }
+        });
+    }
+
     private Ticket buscar(Long id) {
         return tickets.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket no encontrado"));

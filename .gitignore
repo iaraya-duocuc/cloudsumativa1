@@ -37,5 +37,5 @@ build/
 /storage/
 
 .DS_Store
-AWS.txt
-NOTAS.txt
+AWS.md
+NOTAS.md

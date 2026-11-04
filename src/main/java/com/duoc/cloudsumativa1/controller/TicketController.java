@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 import java.nio.charset.StandardCharsets;
 
 @RestController
@@ -41,4 +42,14 @@ public class TicketController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename("ticket" + id + ".txt").build().toString())
                 .body(service.descargar(id));
     }
+    @GetMapping("/usuarios/{id}/tickets")
+    public List<TicketResponse> listarPorUsuario(@PathVariable Long id) {
+        return service.listarPorUsuario(id);
+    }
+
+    @GetMapping("/eventos/{id}/tickets")
+    public List<TicketResponse> listarPorEvento(@PathVariable Long id) {
+        return service.listarPorEvento(id);
+    }
+
 }

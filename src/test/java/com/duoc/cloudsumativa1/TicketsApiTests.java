@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
+import com.duoc.cloudsumativa1.service.TicketService;
+import com.duoc.cloudsumativa1.dto.TicketResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -41,6 +43,7 @@ class TicketsApiTests {
     @Autowired private EventoRepository eventos;
     @Autowired private UsuarioRepository usuarios;
     @Autowired private TicketRepository tickets;
+    @Autowired private TicketService service;
     private MockMvc mvc;
     private Evento evento;
     private Usuario usuario;
@@ -120,4 +123,46 @@ class TicketsApiTests {
         assertThat(tickets.count()).isZero();
         assertThat(eventos.findById(evento.getId()).orElseThrow().getCuposDisponibles()).isEqualTo(1);
     }
+    @Test
+    void filtraTicketsPorUsuarioYEvento() throws Exception {
+        evento.setCuposDisponibles(3);
+        eventos.save(evento);
+        Usuario otroUsuario = new Usuario();
+        otroUsuario.setNombre("Luis");
+        otroUsuario.setCorreo("luis@example.com");
+        usuarios.save(otroUsuario);
+        Evento otroEvento = new Evento();
+        otroEvento.setNombre("Teatro");
+        otroEvento.setFecha(evento.getFecha());
+        otroEvento.setPrecio(evento.getPrecio());
+        otroEvento.setCuposDisponibles(2);
+        eventos.save(otroEvento);
+        TicketResponse primero = service.crear(evento.getId(), usuario.getId());
+        TicketResponse segundo = service.crear(evento.getId(), otroUsuario.getId());
+        TicketResponse tercero = service.crear(otroEvento.getId(), usuario.getId());
+
+        mvc.perform(get("/usuarios/" + usuario.getId() + "/tickets"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[*].id", org.hamcrest.Matchers.containsInAnyOrder(
+                        primero.id().intValue(), tercero.id().intValue())));
+        mvc.perform(get("/eventos/" + evento.getId() + "/tickets"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[*].id", org.hamcrest.Matchers.containsInAnyOrder(
+                        primero.id().intValue(), segundo.id().intValue())));
+
+    }
+
+    @Test
+    void devuelveListaVaciaSiNoHayTickets() throws Exception {
+        for (String ruta : new String[]{"/usuarios/" + usuario.getId(), "/eventos/" + evento.getId()}) {
+            mvc.perform(get(ruta + "/tickets"))
+                    .andExpect(status().isOk()).andExpect(content().json("[]"));
+        }
+        for (String ruta : new String[]{"/usuarios/0/tickets", "/eventos/0/tickets"}) {
+            mvc.perform(get(ruta)).andExpect(status().isNotFound());
+        }
+    }
+
 }

@@ -14,6 +14,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.util.List;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -82,7 +83,10 @@ public class TicketService {
 
     @Transactional(readOnly = true)
     public byte[] descargar(Long id) {
-        Ticket ticket = buscar(id);
+        return leerArchivo(buscar(id));
+    }
+
+    private byte[] leerArchivo(Ticket ticket) {
         if (ticket.getRutaArchivo() == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Archivo de ticket no encontrado");
         }
@@ -93,6 +97,28 @@ public class TicketService {
         } catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo leer el ticket", ex);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<TicketResponse> listarPorUsuario(Long usuarioId) {
+        return buscarPorUsuario(usuarioId).stream().map(TicketResponse::desde).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TicketResponse> listarPorEvento(Long eventoId) {
+        return buscarPorEvento(eventoId).stream().map(TicketResponse::desde).toList();
+    }
+
+    private List<Ticket> buscarPorUsuario(Long usuarioId) {
+        usuarios.buscarPorId(usuarioId);
+        return tickets.findByUsuarioId(usuarioId);
+    }
+
+    private List<Ticket> buscarPorEvento(Long eventoId) {
+        if (!eventos.existsById(eventoId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado");
+        }
+        return tickets.findByEventoId(eventoId);
     }
 
     private Ticket buscar(Long id) {

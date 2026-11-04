@@ -344,6 +344,68 @@
         }
       ],
       "response": []
+    },
+    {
+      "name": "10 - Listar tickets por usuario",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/usuarios/{{usuarioId}}/tickets",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "usuarios",
+            "{{usuarioId}}",
+            "tickets"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Incluye ticket creado\", function () { pm.expect(pm.response.json().map(t => t.id)).to.include(Number(pm.collectionVariables.get(\"ticketId\"))); });"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "11 - Listar tickets por evento",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/eventos/{{eventoId}}/tickets",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "eventos",
+            "{{eventoId}}",
+            "tickets"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Incluye ticket creado\", function () { pm.expect(pm.response.json().map(t => t.id)).to.include(Number(pm.collectionVariables.get(\"ticketId\"))); });"
+            ]
+          }
+        }
+      ],
+      "response": []
     }
   ]
 }

@@ -408,6 +408,37 @@
       "response": []
     },
     {
+      "name": "Consultar estadisticas del evento",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/eventos/{{eventoId}}/estadisticas",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "eventos",
+            "{{eventoId}}",
+            "estadisticas"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Estadisticas del evento\", function () { const data = pm.response.json(); pm.expect(data.eventoId).to.eql(Number(pm.collectionVariables.get(\"eventoId\"))); pm.expect(data.totalReservas).to.be.a(\"number\"); pm.expect(data.cuposDisponibles).to.be.a(\"number\"); pm.expect(data.montoTotalReservado).to.be.a(\"number\"); });"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
       "name": "12 - Modificar observacion del ticket",
       "request": {
         "method": "PATCH",

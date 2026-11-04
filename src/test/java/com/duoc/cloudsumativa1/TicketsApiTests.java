@@ -224,4 +224,36 @@ class TicketsApiTests {
         assertThat(tickets.existsById(ticket.id())).isTrue();
         assertThat(eventos.findById(evento.getId()).orElseThrow().getCuposDisponibles()).isZero();
     }
+    @Test
+    void estadisticasReflejanReservasYEliminacionesDelEvento() throws Exception {
+        evento.setPrecio(new BigDecimal("1250.50"));
+        evento.setCuposDisponibles(3);
+        eventos.save(evento);
+        String ruta = "/eventos/" + evento.getId() + "/estadisticas";
+        mvc.perform(get(ruta)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalReservas").value(0))
+                .andExpect(jsonPath("$.cuposDisponibles").value(3))
+                .andExpect(jsonPath("$.montoTotalReservado").value(0));
+        TicketResponse primero = service.crear(evento.getId(), usuario.getId());
+        service.crear(evento.getId(), usuario.getId());
+        Evento otro = new Evento();
+        otro.setNombre("Otro evento");
+        otro.setFecha(evento.getFecha());
+        otro.setPrecio(new BigDecimal("999"));
+        otro.setCuposDisponibles(1);
+        eventos.save(otro);
+        service.crear(otro.getId(), usuario.getId());
+        mvc.perform(get(ruta)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.eventoId").value(evento.getId()))
+                .andExpect(jsonPath("$.nombreEvento").value("Concierto"))
+                .andExpect(jsonPath("$.totalReservas").value(2))
+                .andExpect(jsonPath("$.cuposDisponibles").value(1))
+                .andExpect(jsonPath("$.montoTotalReservado").value(2501.00));
+        service.eliminar(primero.id());
+        mvc.perform(get(ruta)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalReservas").value(1))
+                .andExpect(jsonPath("$.cuposDisponibles").value(2))
+                .andExpect(jsonPath("$.montoTotalReservado").value(1250.50));
+        mvc.perform(get("/eventos/0/estadisticas")).andExpect(status().isNotFound());
+    }
 }

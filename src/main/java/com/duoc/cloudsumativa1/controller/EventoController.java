@@ -1,6 +1,7 @@
 package com.duoc.cloudsumativa1.controller;
 
 import com.duoc.cloudsumativa1.model.Evento;
+import com.duoc.cloudsumativa1.dto.EstadisticasEventoResponse;
 import com.duoc.cloudsumativa1.service.EventoService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -38,5 +39,9 @@ public class EventoController {
     @GetMapping("/{id}")
     public Evento buscarPorId(@PathVariable Long id) {
         return service.buscarPorId(id);
+    }
+    @GetMapping("/{id}/estadisticas")
+    public EstadisticasEventoResponse estadisticas(@PathVariable Long id) {
+        return service.estadisticas(id);
     }
 }

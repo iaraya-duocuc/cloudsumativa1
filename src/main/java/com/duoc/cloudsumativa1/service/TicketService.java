@@ -1,6 +1,7 @@
 package com.duoc.cloudsumativa1.service;
 
 import com.duoc.cloudsumativa1.dto.TicketResponse;
+import com.duoc.cloudsumativa1.model.Asset;
 import com.duoc.cloudsumativa1.model.Evento;
 import com.duoc.cloudsumativa1.model.Ticket;
 import com.duoc.cloudsumativa1.model.Usuario;
@@ -29,13 +30,15 @@ public class TicketService {
     private final EventoRepository eventos;
     private final UsuarioService usuarios;
     private final TicketStorageService storage;
+    private final AwsService aws;
 
     public TicketService(TicketRepository tickets, EventoRepository eventos,
-                         UsuarioService usuarios, TicketStorageService storage) {
+                         UsuarioService usuarios, TicketStorageService storage, AwsService aws) {
         this.tickets = tickets;
         this.eventos = eventos;
         this.usuarios = usuarios;
         this.storage = storage;
+        this.aws = aws;
     }
 
     @Transactional
@@ -65,11 +68,21 @@ public class TicketService {
                         } catch (IOException ex) {
                             log.error("No se pudo eliminar el TXT de una reserva revertida: {}", archivo, ex);
                         }
+                        if (aws.habilitado()) {
+                            try {
+                                aws.eliminar(ticket);
+                            } catch (RuntimeException ex) {
+                                log.error("No se pudo limpiar el ticket revertido en S3", ex);
+                            }
+                        }
                     }
                 }
             });
             ticket.setRutaArchivo(archivo.toString());
             tickets.saveAndFlush(ticket);
+            if (aws.habilitado()) {
+                aws.subir(ticket, storage.leer(ticket.getRutaArchivo()));
+            }
             return TicketResponse.desde(ticket);
         } catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo guardar el ticket", ex);
@@ -128,6 +141,9 @@ public class TicketService {
         prepararRestauracion(ticket);
         try {
             storage.actualizar(ticket);
+            if (aws.habilitado()) {
+                aws.subir(ticket, storage.leer(ticket.getRutaArchivo()));
+            }
             tickets.saveAndFlush(ticket);
             return TicketResponse.desde(ticket);
         } catch (IOException ex) {
@@ -142,6 +158,9 @@ public class TicketService {
         prepararRestauracion(ticket);
         try {
             storage.eliminar(ticket.getRutaArchivo());
+            if (aws.habilitado()) {
+                aws.eliminar(ticket);
+            }
             evento.setCuposDisponibles(evento.getCuposDisponibles() + 1);
             tickets.delete(ticket);
             tickets.flush();
@@ -169,6 +188,7 @@ public class TicketService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo leer el TXT", ex);
         }
         byte[] copia = anterior;
+        byte[] copiaS3 = aws.habilitado() ? aws.respaldo(ticket) : null;
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCompletion(int status) {
@@ -178,9 +198,28 @@ public class TicketService {
                     } catch (IOException ex) {
                         log.error("No se pudo restaurar el TXT de una operación revertida: {}", ruta, ex);
                     }
+                    if (aws.habilitado()) {
+                        try {
+                            aws.restaurar(ticket, copiaS3);
+                        } catch (RuntimeException ex) {
+                            log.error("No se pudo restaurar el ticket en S3", ex);
+                        }
+                    }
                 }
             }
         });
+    }
+
+    @Transactional
+    public Asset subirS3(Long id) {
+        Ticket ticket = buscarParaModificar(id);
+        byte[] contenido = leerArchivo(ticket);
+        return aws.subir(ticket, contenido);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] descargarS3(Long id) {
+        return aws.descargar(buscar(id));
     }
 
     private Ticket buscar(Long id) {

@@ -24,6 +24,11 @@
       "key": "ticketId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "ejecutarS3",
+      "value": "false",
+      "type": "string"
     }
   ],
   "item": [
@@ -512,6 +517,82 @@
         }
       ],
       "response": []
+    },
+    {
+      "name": "S3 opcional (activar ejecutarS3 para Collection Runner)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.collectionVariables.get(\"ejecutarS3\") !== \"true\") { pm.execution.skipRequest(); }"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "Subir ticket TXT a S3",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tickets/{{ticketId}}/s3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticketId}}",
+                "s3"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Estado 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Descargar ticket TXT desde S3",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tickets/{{ticketId}}/s3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticketId}}",
+                "s3"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Estado 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
     },
     {
       "name": "14 - Eliminar ticket y devolver cupo",

@@ -57,3 +57,9 @@ CREATE DATABASE IF NOT EXISTS cloudsumativa1;
 `MYSQL_JDBC_URL` debe apuntar a esa base. Las tablas se crean automáticamente.
 
 Al reiniciar el lab de AWS Academy, actualizar `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y `AWS_SESSION_TOKEN` en GitHub Secrets y volver a ejecutar el workflow de despliegue.
+
+Al reiniciar EC2 o el lab, verificar el montaje de EFS y, si falta, volver a montarlo antes de desplegar:
+
+```sh
+sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport fs-0a18d88fdf8fc799a.efs.us-east-1.amazonaws.com:/ /mnt/efs
+```

@@ -1,5 +1,7 @@
 # cloudsumativa1
 
+Sistema de reservas de eventos desarrollado con Spring Boot que permite gestionar usuarios, reservar cupos y generar tickets en formato TXT. Incluye consulta, modificación y eliminación de tickets, además de estadísticas por evento. Utiliza H2 o MySQL para los datos, EFS para los archivos y S3 para su almacenamiento y descarga, con despliegue automatizado en EC2 mediante GitHub Actions y Docker.
+
 Requiere Java 21. Ejecutar desde esta carpeta.
 
 H2 (por defecto):
